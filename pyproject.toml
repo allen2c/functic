@@ -1,0 +1,56 @@
+[tool.poetry]
+authors = ["allen2c <f1470891079@gmail.com>"]
+description = "Quick define a function compatibility to OpenAI function tool."
+license = "MIT"
+name = "functic"
+readme = "README.md"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+diskcache = "*"
+json_repair = "*"
+openai = "^1"
+pydantic = "^2"
+pydantic-settings = "*"
+python = "^3.12"
+
+[tool.poetry.extras]
+all = []
+
+[tool.poetry.group.docs.dependencies]
+mkdocs-git-authors-plugin = "*"
+mkdocs-git-committers-plugin-2 = "*"
+mkdocs-git-revision-date-localized-plugin = "*"
+mkdocs-material = "^9"
+mkdocs-minify-plugin = "*"
+mkdocs-nav-weight = "*"
+mkdocs-redirects = "*"
+mkdocs-render-swagger-plugin = "*"
+neoteroi-mkdocs = "*"
+
+[tool.poetry.group.dev.dependencies]
+black = { extras = ["jupyter"], version = "*" }
+faker = "*"
+isort = "*"
+matplotlib = "*"
+pandas = "*"
+poetry-plugin-export = "^1.6.0"
+pytest = "^8"
+pytest-asyncio = "*"
+pytest-cov = "^4"
+pytest-xdist = "^3"
+scipy = "*"
+setuptools = ">=69"
+
+
+[tool.isort]
+profile = "black"
+
+[tool.flake8]
+ignore = ["E203", "E704", "W503"]
+max-line-length = 88
+
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core"]
