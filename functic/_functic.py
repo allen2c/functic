@@ -1,6 +1,6 @@
 import json
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Final, Text, Type
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, Text, Type
 
 from json_repair import repair_json
 from openai.types.beta.function_tool import FunctionTool
@@ -11,17 +11,12 @@ from openai.types.chat.chat_completion_tool_message_param import (
 )
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from openai.types.shared.function_definition import FunctionDefinition
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from functic.types.chat_completion_tool import ChatCompletionTool
     from functic.types.chat_completion_tool_message import ChatCompletionToolMessage
     from functic.types.tool_output import ToolOutput
-
-FIELD_FUNCTION_NAME: Final[Text] = "FUNCTION_NAME"
-FIELD_FUNCTION_DESCRIPTION: Final[Text] = "FUNCTION_DESCRIPTION"
-FIELD_FUNCTION: Final[Text] = "FUNCTION"
-FIELD_FUNCTION_ERROR_CONTENT: Final[Text] = "FUNCTION_ERROR_CONTENT"
 
 
 class FuncticFunctionDefinitionDescriptor:
@@ -146,19 +141,47 @@ class FuncticParser:
         )  # type: ignore
 
 
+class FuncticConfig(BaseModel):
+    name: Text = Field(
+        ...,
+        description="The name of the function.",
+        pattern=r"^[a-zA-Z0-9_-]*$",
+    )
+    description: Text = Field(
+        ...,
+        description="A description of the function.",
+    )
+    function: Text = Field(
+        ...,
+        description="The path of the callable function.",
+    )
+    error_content: Text = Field(
+        default=dedent(
+            """
+            The service is currently unavailable. Please try again later.
+            """
+        ).strip(),
+        description="The content of the error message.",
+    )
+
+    @classmethod
+    def is_config_valid(cls, config: "FuncticConfig") -> bool:
+        return True  # TODO: Implement validation
+
+    def is_valid(self) -> bool:
+        return self.is_config_valid(self)
+
+    def raise_if_invalid(self) -> None:
+        if not self.is_config_valid(self):
+            raise ValueError(f"Invalid configuration: {self}")
+
+
 class FuncticBaseModel(BaseModel, FuncticParser):
     # Function arguments
     # <function_arguments>
 
     # Class variables for overrides
-    FUNCTION_NAME: ClassVar[Text]
-    FUNCTION_DESCRIPTION: ClassVar[Text]
-    FUNCTION: ClassVar[Callable]
-    FUNCTION_ERROR_CONTENT: ClassVar[Text] = dedent(
-        """
-        The service is currently unavailable. Please try again later.
-        """
-    ).strip()
+    config: ClassVar[FuncticConfig]
 
     # Class variables for internal use
     function_definition: ClassVar[FuncticFunctionDefinitionDescriptor] = (
@@ -183,3 +206,14 @@ class FuncticBaseModel(BaseModel, FuncticParser):
             json.loads(repair_json(args_str)) if args_str else {}  # type: ignore
         )
         return cls.model_validate(func_kwargs)
+
+    @classmethod
+    def is_base_model_valid(cls, config: Optional[FuncticConfig] = None) -> bool:
+        if config is not None:
+            return config.is_valid()
+        if hasattr(cls, "config"):
+            return cls.config.is_valid()
+        else:
+            raise ValueError(
+                "No configuration provided and no default configuration found."
+            )

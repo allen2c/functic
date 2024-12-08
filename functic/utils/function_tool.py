@@ -1,19 +1,13 @@
 from typing import TYPE_CHECKING, List, Sequence, Type
 
 from openai.types.beta.function_tool import FunctionTool
-from pydantic import BaseModel
 
 if TYPE_CHECKING:
     import functic
 
 
 def from_base_model(
-    base_model_type: (
-        Type["functic.FuncticBaseModel"]
-        | "functic.FuncticBaseModel"
-        | Type[BaseModel]
-        | BaseModel
-    ),
+    base_model_type: Type["functic.FuncticBaseModel"] | "functic.FuncticBaseModel",
 ) -> "FunctionTool":
     import functic.utils.function_definition
 
@@ -29,10 +23,7 @@ def from_base_model(
 
 def from_base_models(
     base_model_types: Sequence[
-        Type["functic.FuncticBaseModel"]
-        | "functic.FuncticBaseModel"
-        | Type[BaseModel]
-        | BaseModel
+        Type["functic.FuncticBaseModel"] | "functic.FuncticBaseModel"
     ],
 ) -> List["FunctionTool"]:
     return [from_base_model(base_model_type) for base_model_type in base_model_types]
