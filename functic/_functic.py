@@ -279,6 +279,10 @@ class FuncticBaseModel(BaseModel, FuncticParser):
         )
 
     @property
+    def tool_message_param(self) -> "ChatCompletionToolMessageParam":
+        return self.tool_message.model_dump(exclude_none=True)  # type: ignore
+
+    @property
     def tool_output(self) -> "ToolOutput":
         from functic.config import console
 
@@ -297,6 +301,10 @@ class FuncticBaseModel(BaseModel, FuncticParser):
             self.content, tool_call_id=tool_call_id
         )
 
+    @property
+    def tool_output_param(self) -> "run_submit_tool_outputs_params.ToolOutput":
+        return self.tool_output.model_dump(exclude_none=True)  # type: ignore
+
     def set_tool_call_id(self, tool_call_id: Text) -> None:
         self._tool_call_id = tool_call_id
 
@@ -308,7 +316,7 @@ class FuncticBaseModel(BaseModel, FuncticParser):
 
         func = self.config.get_function()
 
-        func_res = await run_func(func, **json.loads(self.model_dump_json()))
+        func_res = await run_func(func, self)
         self.set_content(func_res)
         return func_res
 
@@ -316,4 +324,4 @@ class FuncticBaseModel(BaseModel, FuncticParser):
         from functic.utils.run import sync_run_func
 
         func = self.config.get_function()
-        return sync_run_func(func, **json.loads(self.model_dump_json()))
+        return sync_run_func(func, self)

@@ -16,10 +16,12 @@ def import_function(
     path_spec: typing.Text,
     notation: typing.Literal["dot", "colon", ".", ":"] | typing.Text | None = None,
 ) -> FunctionType | CoroutineType:
-    notation = "." if notation == "dot" else notation
     notation = ":" if notation == "colon" else notation
+    notation = (
+        ":" if notation is None and ":" in path_spec else notation
+    )  # Higher priority than dot
+    notation = "." if notation == "dot" else notation
     notation = "." if notation is None and "." in path_spec else notation
-    notation = ":" if notation is None and ":" in path_spec else notation
 
     # Check if notation is valid
     if notation is None:
