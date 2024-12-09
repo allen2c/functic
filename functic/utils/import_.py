@@ -14,7 +14,7 @@ CoroutineType = Callable[P, Coroutine[Any, Any, R]]  # Coroutine function type
 
 def import_function(
     path_spec: typing.Text,
-    notation: typing.Literal["dot", "colon", ".", ":"] | typing.Text | None,
+    notation: typing.Literal["dot", "colon", ".", ":"] | typing.Text | None = None,
 ) -> FunctionType | CoroutineType:
     notation = "." if notation == "dot" else notation
     notation = ":" if notation == "colon" else notation
@@ -44,3 +44,9 @@ def import_function(
         )
 
     return function
+
+
+if __name__ == "__main__":
+    print(import_function("textwrap.dedent"))
+    print(import_function("textwrap:dedent"))
+    print(import_function("asyncio:gather"))
