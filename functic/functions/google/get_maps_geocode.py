@@ -29,7 +29,7 @@ get_maps_geocode_config = FuncticConfig.model_validate(
 
 class GetMapsGeocode(FuncticBaseModel):
     # Function config
-    config: ClassVar[FuncticConfig] = get_maps_geocode_config
+    functic_config: ClassVar[FuncticConfig] = get_maps_geocode_config
 
     # Function arguments
     address: Optional[Text] = Field(..., description="The address to geocode.")
@@ -46,15 +46,15 @@ class GetMapsGeocode(FuncticBaseModel):
     def parse_content(cls, response: Dict[Text, Any]) -> Text:
         if not response:
             console.print("Got empty function response content")
-            return cls.config.error_content
+            return cls.functic_config.error_content
         if not isinstance(response, Dict):
             console.print(f"Invalid response type: {type(response)}")
-            return cls.config.error_content
+            return cls.functic_config.error_content
         try:
             return format_maps_geocode_article(response)
         except Exception:
             console.print_exception()
-            return cls.config.error_content
+            return cls.functic_config.error_content
 
 
 class AddressComponent(BaseModel):

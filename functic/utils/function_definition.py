@@ -16,8 +16,8 @@ def from_base_model(
     model_json_schema.pop("title", None)
     return FunctionDefinition.model_validate(
         {
-            "name": base_model_type.config.name,
-            "description": base_model_type.config.description,
+            "name": base_model_type.functic_config.name,
+            "description": base_model_type.functic_config.description,
             "parameters": model_json_schema,
         }
     )

@@ -53,7 +53,7 @@ class FuncticEventHandler(AssistantEventHandler):
 
             # Pick the tool
             for func_tool in self.tools_set:
-                if tool_call.function.name != func_tool.config.name:
+                if tool_call.function.name != func_tool.functic_config.name:
                     continue
 
                 # Debugging
@@ -87,7 +87,7 @@ class FuncticEventHandler(AssistantEventHandler):
                 raise ValueError(
                     f"Function name '{tool_call.function.name}' not found, "
                     + "available functions: "
-                    + f"{', '.join([t.config.name for t in self.tools_set])}"
+                    + f"{', '.join([t.functic_config.name for t in self.tools_set])}"
                 )
 
         # Submit all tool_outputs at the same time

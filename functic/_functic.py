@@ -207,7 +207,7 @@ class FuncticBaseModel(BaseModel, FuncticParser):
     # <function_arguments>
 
     # Class variables for overrides
-    config: ClassVar[FuncticConfig]
+    functic_config: ClassVar[FuncticConfig]
 
     # Class variables for internal use
     function_definition: ClassVar[FuncticFunctionDefinitionDescriptor] = (
@@ -241,8 +241,8 @@ class FuncticBaseModel(BaseModel, FuncticParser):
     def is_base_model_valid(cls, config: Optional[FuncticConfig] = None) -> bool:
         if config is not None:
             return config.is_valid()
-        if hasattr(cls, "config"):
-            return cls.config.is_valid()
+        if hasattr(cls, "functic_config"):
+            return cls.functic_config.is_valid()
         else:
             raise ValueError(
                 "No configuration provided and no default configuration found."
@@ -314,7 +314,7 @@ class FuncticBaseModel(BaseModel, FuncticParser):
     async def execute(self) -> Any:
         from functic.utils.run import run_func
 
-        func = self.config.get_function()
+        func = self.functic_config.get_function()
 
         func_res = await run_func(func, self)
         self.set_content(func_res)
@@ -323,7 +323,7 @@ class FuncticBaseModel(BaseModel, FuncticParser):
     def sync_execute(self) -> Any:
         from functic.utils.run import sync_run_func
 
-        func = self.config.get_function()
+        func = self.functic_config.get_function()
         func_res = sync_run_func(func, self)
         self.set_content(func_res)
         return func_res

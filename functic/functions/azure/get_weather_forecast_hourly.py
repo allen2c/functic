@@ -33,7 +33,7 @@ get_weather_forecast_hourly_config = FuncticConfig.model_validate(
 
 class GetWeatherForecastHourly(FuncticBaseModel):
     # Function config
-    config: ClassVar[FuncticConfig] = get_weather_forecast_hourly_config
+    functic_config: ClassVar[FuncticConfig] = get_weather_forecast_hourly_config
 
     # Function arguments
     query: Text = Field(
@@ -71,15 +71,15 @@ class GetWeatherForecastHourly(FuncticBaseModel):
     def parse_content(cls, response: Dict[Text, Any]) -> Text:
         if not response:
             console.print("Got empty function response content")
-            return cls.config.error_content
+            return cls.functic_config.error_content
         if not isinstance(response, Dict):
             console.print(f"Invalid response type: {type(response)}")
-            return cls.config.error_content
+            return cls.functic_config.error_content
         try:
             return format_weather_article(response)
         except Exception:
             console.print_exception()
-            return cls.config.error_content
+            return cls.functic_config.error_content
 
 
 def get_weather_forecast_hourly(request: "GetWeatherForecastHourly"):
