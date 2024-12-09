@@ -7,6 +7,7 @@ import rich.json
 import rich.panel
 from openai import AssistantEventHandler
 from openai.types.beta.assistant_stream_event import AssistantStreamEvent
+from openai.types.beta.threads import Message
 from openai.types.beta.threads.run import Run
 from openai.types.beta.threads.run_submit_tool_outputs_params import ToolOutput
 from typing_extensions import override
@@ -17,6 +18,7 @@ from functic.functions.azure.get_weather_forecast_daily import GetWeatherForecas
 from functic.functions.azure.get_weather_forecast_hourly import GetWeatherForecastHourly
 from functic.functions.google.get_maps_geocode import GetMapsGeocode
 from functic.types.assistant_create import AssistantCreate
+from functic.utils.display import display_thread_message
 
 ASSISTANT_NAME = "asst_functic"
 ASSISTANT_INSTRUCTIONS = dedent(
@@ -46,9 +48,17 @@ DEBUG = True
 
 class EventHandler(AssistantEventHandler):
 
-    def __init__(self, client: openai.OpenAI, *args, debug: bool = False, **kwargs):
+    def __init__(
+        self,
+        client: openai.OpenAI,
+        *args,
+        messages: typing.Optional[typing.List[Message]] = None,
+        debug: bool = False,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.client = client
+        self.messages = messages or []
         self.debug = debug
 
     @override
@@ -58,6 +68,10 @@ class EventHandler(AssistantEventHandler):
         if event.event == "thread.run.requires_action":
             run_id = event.data.id  # Retrieve the run ID from the event data
             self.handle_requires_action(event.data, run_id)
+
+    @override
+    def on_message_done(self, message: Message) -> None:
+        self.messages.append(message)
 
     def handle_requires_action(self, data: "Run", run_id: typing.Text) -> None:
         if data.required_action is None:
@@ -104,14 +118,11 @@ class EventHandler(AssistantEventHandler):
             thread_id=self.current_run.thread_id,
             run_id=self.current_run.id,
             tool_outputs=tool_outputs,
-            event_handler=EventHandler(self.client, debug=self.debug),
+            event_handler=EventHandler(
+                self.client, messages=self.messages, debug=self.debug
+            ),
         ) as stream:
-            if self.debug:
-                for text in stream.text_deltas:
-                    print(text, end="", flush=True)
-                print()
-            else:
-                stream.until_done()
+            stream.until_done()
 
 
 def main():
@@ -129,44 +140,34 @@ def main():
         ),
         force=FORCE,
     )
-
-    console.print(
-        rich.panel.Panel(
-            rich.json.JSON(assistant.model_dump_json()),
-            box=rich.box.SQUARE,
-            title=f"Assistant: {ASSISTANT_NAME} ({assistant.id})",
+    if DEBUG:
+        console.print(
+            rich.panel.Panel(
+                rich.json.JSON(assistant.model_dump_json()),
+                box=rich.box.SQUARE,
+                title=f"Assistant: {ASSISTANT_NAME} ({assistant.id})",
+            )
         )
-    )
 
     thread = client.beta.threads.create()
-    client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content="台北內湖後天天氣如何？",
+    thread_messages: typing.List[Message] = []
+    thread_messages.append(
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content="How is the weather in Tokyo day after tomorrow?",
+        )
     )
 
     with client.beta.threads.runs.stream(
         thread_id=thread.id,
         assistant_id=assistant.id,
-        event_handler=EventHandler(client, debug=DEBUG),
+        event_handler=EventHandler(client, messages=thread_messages, debug=DEBUG),
     ) as stream:
-        if DEBUG:
-            for text in stream.text_deltas:
-                print(text, end="", flush=True)
-            print()
-        else:
-            stream.until_done()
+        stream.until_done()
 
     for message in client.beta.threads.messages.list(thread_id=thread.id, order="asc"):
-        console.print("")
-        console.print(message.role, style="bright_magenta")
-        console.print(
-            "".join(
-                content.text.value
-                for content in message.content
-                if content.type == "text"
-            )
-        )
+        display_thread_message(message)
 
 
 if __name__ == "__main__":
