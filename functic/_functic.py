@@ -91,7 +91,7 @@ class FuncticFunctionToolParamDescriptor:
 
 class FuncticParser:
     @classmethod
-    def parse_function_return_as_tool_content(cls, response: Any) -> Text:
+    def parse_content(cls, response: Any) -> Text:
         return str(response)
 
     @classmethod
@@ -102,7 +102,7 @@ class FuncticParser:
 
         return ChatCompletionToolMessage.model_validate(
             {
-                "content": cls.parse_function_return_as_tool_content(response),
+                "content": cls.parse_content(response),
                 "tool_call_id": tool_call_id,
             }
         )
@@ -125,7 +125,7 @@ class FuncticParser:
 
         return ToolOutput.model_validate(
             {
-                "output": cls.parse_function_return_as_tool_content(response),
+                "output": cls.parse_content(response),
                 "tool_call_id": tool_call_id,
             }
         )
