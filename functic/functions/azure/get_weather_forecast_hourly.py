@@ -1,11 +1,9 @@
-import json
 import os
 from datetime import datetime
 from textwrap import dedent
 from typing import Any, ClassVar, Dict, Text
 
 import requests
-from json_repair import repair_json
 from pydantic import Field, SecretStr
 
 from functic import FuncticBaseModel, FuncticConfig
@@ -78,14 +76,6 @@ class GetWeatherForecastHourly(FuncticBaseModel):
         except Exception:
             console.print_exception()
             return cls.config.error_content
-
-    @classmethod
-    def from_args_str(cls, args_str: Text):
-        func_kwargs = (
-            json.loads(repair_json(args_str)) if args_str else {}  # type: ignore
-        )
-
-        return cls.model_validate(func_kwargs)
 
 
 def get_weather_forecast_hourly(request: "GetWeatherForecastHourly"):
