@@ -70,7 +70,11 @@ class GetWeatherForecastDaily(FuncticBaseModel):
 
     @classmethod
     def parse_content(cls, response: Dict[Text, Any]) -> Text:
-        if not response and not isinstance(response, Dict):
+        if not response:
+            console.print("Got empty function response content")
+            return cls.config.error_content
+        if not isinstance(response, Dict):
+            console.print(f"Invalid response type: {type(response)}")
             return cls.config.error_content
         try:
             return format_weather_article(response)

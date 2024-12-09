@@ -324,4 +324,6 @@ class FuncticBaseModel(BaseModel, FuncticParser):
         from functic.utils.run import sync_run_func
 
         func = self.config.get_function()
-        return sync_run_func(func, self)
+        func_res = sync_run_func(func, self)
+        self.set_content(func_res)
+        return func_res
