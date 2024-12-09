@@ -1,7 +1,21 @@
 import json
+import random
+import string
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, Text, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    ClassVar,
+    Coroutine,
+    Optional,
+    ParamSpec,
+    Text,
+    Type,
+    TypeVar,
+)
 
+import openai
 from json_repair import repair_json
 from openai.types.beta.function_tool import FunctionTool
 from openai.types.beta.function_tool_param import FunctionToolParam
@@ -11,12 +25,19 @@ from openai.types.chat.chat_completion_tool_message_param import (
 )
 from openai.types.chat.chat_completion_tool_param import ChatCompletionToolParam
 from openai.types.shared.function_definition import FunctionDefinition
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 if TYPE_CHECKING:
     from functic.types.chat_completion_tool import ChatCompletionTool
     from functic.types.chat_completion_tool_message import ChatCompletionToolMessage
     from functic.types.tool_output import ToolOutput
+
+
+R = TypeVar("R")
+P = ParamSpec("P")
+
+FunctionType = Callable[P, R]  # Regular function type
+CoroutineType = Callable[P, Coroutine[Any, Any, R]]  # Coroutine function type
 
 
 class FuncticFunctionDefinitionDescriptor:
@@ -123,6 +144,11 @@ class FuncticConfig(BaseModel):
         if not self.is_config_valid(self):
             raise ValueError(f"Invalid configuration: {self}")
 
+    def get_function(self) -> FunctionType | CoroutineType:
+        from functic.utils.import_ import import_function
+
+        return import_function(self.function)
+
 
 class FuncticParser:
     @classmethod
@@ -130,7 +156,7 @@ class FuncticParser:
         return str(response)
 
     @classmethod
-    def parse_function_return_as_openai_tool_message(
+    def parse_content_as_openai_tool_message(
         cls, response: Any, *, tool_call_id: Text
     ) -> "ChatCompletionToolMessage":
         from functic.types.chat_completion_tool_message import ChatCompletionToolMessage
@@ -143,17 +169,17 @@ class FuncticParser:
         )
 
     @classmethod
-    def parse_function_return_as_openai_tool_message_param(
+    def parse_content_as_openai_tool_message_param(
         cls, response: Any, *, tool_call_id: Text
     ) -> ChatCompletionToolMessageParam:
-        return cls.parse_function_return_as_openai_tool_message(
+        return cls.parse_content_as_openai_tool_message(
             response, tool_call_id=tool_call_id
         ).model_dump(
             exclude_none=True
         )  # type: ignore
 
     @classmethod
-    def parse_function_return_as_assistant_tool_output(
+    def parse_content_as_assistant_tool_output(
         cls, response: Any, *, tool_call_id: Text
     ) -> "ToolOutput":
         from functic.types.tool_output import ToolOutput
@@ -166,10 +192,10 @@ class FuncticParser:
         )
 
     @classmethod
-    def parse_function_return_as_assistant_tool_output_param(
+    def parse_content_as_assistant_tool_output_param(
         cls, response: Any, *, tool_call_id: Text
     ) -> "run_submit_tool_outputs_params.ToolOutput":
-        return cls.parse_function_return_as_assistant_tool_output(
+        return cls.parse_content_as_assistant_tool_output(
             response, tool_call_id=tool_call_id
         ).model_dump(
             exclude_none=True
@@ -200,6 +226,10 @@ class FuncticBaseModel(BaseModel, FuncticParser):
         FuncticFunctionToolParamDescriptor()
     )
 
+    # Private attributes
+    _tool_call_id: Optional[Text] = PrivateAttr(default=None)
+    _content: Optional[Any | openai.NotGiven] = PrivateAttr(default=openai.NOT_GIVEN)
+
     @classmethod
     def from_args_str(cls, args_str: Text):
         func_kwargs = (
@@ -217,3 +247,73 @@ class FuncticBaseModel(BaseModel, FuncticParser):
             raise ValueError(
                 "No configuration provided and no default configuration found."
             )
+
+    @property
+    def content(self) -> Any:
+        if self._content is openai.NOT_GIVEN:
+            raise ValueError(
+                "Response content is not set, please execute the function first."
+            )
+        return self._content
+
+    @property
+    def content_parsed(self) -> Any:
+        return self.parse_content(self.content)
+
+    @property
+    def tool_message(self) -> "ChatCompletionToolMessage":
+        from functic.config import console
+
+        tool_call_id = self._tool_call_id
+        if tool_call_id is None:
+            console.print(
+                "No tool call id found, you might want to set the tool call id "
+                + "provided by the LLM API.",
+                style="yellow",
+            )
+            tool_call_id = "tool_" + "".join(
+                random.choices(string.ascii_letters + string.digits, k=12)
+            )
+        return self.parse_content_as_openai_tool_message(
+            self.content, tool_call_id=tool_call_id
+        )
+
+    @property
+    def tool_output(self) -> "ToolOutput":
+        from functic.config import console
+
+        tool_call_id = self._tool_call_id
+        if tool_call_id is None:
+            console.print(
+                "No tool call id found, you might want to set the tool call id "
+                + "provided by the LLM API.",
+                style="yellow",
+            )
+            tool_call_id = "tool_" + "".join(
+                random.choices(string.ascii_letters + string.digits, k=12)
+            )
+
+        return self.parse_content_as_assistant_tool_output(
+            self.content, tool_call_id=tool_call_id
+        )
+
+    def set_tool_call_id(self, tool_call_id: Text) -> None:
+        self._tool_call_id = tool_call_id
+
+    def set_content(self, content: Any) -> None:
+        self._content = content
+
+    async def execute(self) -> Any:
+        from functic.utils.run import run_func
+
+        func = self.config.get_function()
+
+        func_res = await run_func(func, **json.loads(self.model_dump_json()))
+        self.set_content(func_res)
+        return func_res
+
+    def sync_execute(self) -> Any:
+        from functic.utils.run import sync_run_func
+
+        func = self.config.get_function()
+        return sync_run_func(func, **json.loads(self.model_dump_json()))

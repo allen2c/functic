@@ -28,3 +28,14 @@ if __name__ == "__main__":
 
     res = asyncio.run(run_func(test_func, "John"))
     print(res)
+
+
+def sync_run_func(
+    func: FunctionType | CoroutineType[P, R], *args: P.args, **kwargs: P.kwargs
+) -> R:
+    if inspect.iscoroutinefunction(func):
+        func = typing.cast(CoroutineType[P, R], func)
+        return asyncio.run(func(*args, **kwargs))
+    else:
+        func = typing.cast(FunctionType[P, R], func)
+        return func(*args, **kwargs)
