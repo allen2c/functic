@@ -89,6 +89,41 @@ class FuncticFunctionToolParamDescriptor:
         return owner.function_tool.model_dump(exclude_none=True)  # type: ignore
 
 
+class FuncticConfig(BaseModel):
+    name: Text = Field(
+        ...,
+        description="The name of the function.",
+        pattern=r"^[a-zA-Z0-9_-]*$",
+    )
+    description: Text = Field(
+        ...,
+        description="A description of the function.",
+    )
+    function: Text = Field(
+        ...,
+        description="The path of the callable function.",
+    )
+    error_content: Text = Field(
+        default=dedent(
+            """
+            The service is currently unavailable. Please try again later.
+            """
+        ).strip(),
+        description="The content of the error message.",
+    )
+
+    @classmethod
+    def is_config_valid(cls, config: "FuncticConfig") -> bool:
+        return True  # TODO: Implement validation
+
+    def is_valid(self) -> bool:
+        return self.is_config_valid(self)
+
+    def raise_if_invalid(self) -> None:
+        if not self.is_config_valid(self):
+            raise ValueError(f"Invalid configuration: {self}")
+
+
 class FuncticParser:
     @classmethod
     def parse_content(cls, response: Any) -> Text:
@@ -139,41 +174,6 @@ class FuncticParser:
         ).model_dump(
             exclude_none=True
         )  # type: ignore
-
-
-class FuncticConfig(BaseModel):
-    name: Text = Field(
-        ...,
-        description="The name of the function.",
-        pattern=r"^[a-zA-Z0-9_-]*$",
-    )
-    description: Text = Field(
-        ...,
-        description="A description of the function.",
-    )
-    function: Text = Field(
-        ...,
-        description="The path of the callable function.",
-    )
-    error_content: Text = Field(
-        default=dedent(
-            """
-            The service is currently unavailable. Please try again later.
-            """
-        ).strip(),
-        description="The content of the error message.",
-    )
-
-    @classmethod
-    def is_config_valid(cls, config: "FuncticConfig") -> bool:
-        return True  # TODO: Implement validation
-
-    def is_valid(self) -> bool:
-        return self.is_config_valid(self)
-
-    def raise_if_invalid(self) -> None:
-        if not self.is_config_valid(self):
-            raise ValueError(f"Invalid configuration: {self}")
 
 
 class FuncticBaseModel(BaseModel, FuncticParser):
