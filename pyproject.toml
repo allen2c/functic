@@ -16,7 +16,7 @@ python = "^3.12"
 redis = "^5"
 
 [tool.poetry.extras]
-all = []
+all = ["googlemaps"]
 
 [tool.poetry.group.docs.dependencies]
 mkdocs-git-authors-plugin = "*"
@@ -32,6 +32,7 @@ neoteroi-mkdocs = "*"
 [tool.poetry.group.dev.dependencies]
 black = { extras = ["jupyter"], version = "*" }
 faker = "*"
+googlemaps = "*"
 isort = "*"
 matplotlib = "*"
 pandas = "*"
