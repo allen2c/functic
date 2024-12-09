@@ -6,14 +6,14 @@ from typing import Any, ClassVar, Dict, Literal, Text, cast
 
 import requests
 from json_repair import repair_json
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_core import ValidationError
 
 from functic import FuncticBaseModel, FuncticConfig
 from functic.config import console
 from functic.utils.get import get_safe_value
 
-AZURE_MAPS_KEY = os.environ["AZURE_MAPS_KEY"]
+AZURE_MAPS_KEY: SecretStr = SecretStr(os.environ["AZURE_MAPS_KEY"])
 AZURE_WEATHER_FORECAST_DAILY_URL = (
     "https://atlas.microsoft.com/weather/forecast/daily/json"
 )
@@ -107,7 +107,7 @@ def get_weather_forecast_daily(request: "GetWeatherForecastDaily"):
     url = AZURE_WEATHER_FORECAST_DAILY_URL
     params = request.model_dump(exclude_none=True)
     params["api-version"] = AZURE_WEATHER_FORECAST_DAILY_API_VERSION
-    params["subscription-key"] = AZURE_MAPS_KEY
+    params["subscription-key"] = AZURE_MAPS_KEY.get_secret_value()
     response = requests.get(url, params=params)
     return response.json()
 
