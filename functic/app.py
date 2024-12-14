@@ -19,6 +19,8 @@ import functic
 from functic.types.pagination import Pagination
 from functic.types.tool_output import ToolOutput
 
+type FuncticFunctions = typing.Dict[typing.Text, typing.Type[functic.FuncticBaseModel]]
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI) -> typing.AsyncIterator[None]:
@@ -77,24 +79,29 @@ def create_app() -> fastapi.FastAPI:
     logger.debug("Creating application")
     app = fastapi.FastAPI(lifespan=lifespan)
 
+    def depends_functic_functions() -> FuncticFunctions:
+        return app.state.functic_functions
+
     # Add routes
     @app.get("/functions")
     async def api_list_functions(
         request: fastapi.Request,
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
     ) -> Pagination[FunctionDefinition]:
-        functic_models: typing.List[typing.Type[functic.FuncticBaseModel]] = list(
-            app.state.functic_functions.values()
+        return Pagination(
+            data=[m.function_definition for m in list(functic_functions.values())]
         )
-        return Pagination(data=[m.function_definition for m in functic_models])
 
     @app.get("/functions/{function_name}")
     async def api_retrieve_function(
-        request: fastapi.Request, function_name: typing.Text = fastapi.Path(...)
+        request: fastapi.Request,
+        function_name: typing.Text = fastapi.Path(...),
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
     ) -> FunctionDefinition:
-        functic_functions: typing.Dict[
-            typing.Text, typing.Type[functic.FuncticBaseModel]
-        ] = app.state.functic_functions
-
         if function_name not in functic_functions:
             raise fastapi.HTTPException(status_code=404, detail="Function not found")
 
@@ -104,11 +111,10 @@ def create_app() -> fastapi.FastAPI:
     @app.post("/functions/invoke")
     async def api_invoke_function(
         function_invoke_request: Function = fastapi.Body(...),
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
     ) -> FunctionInvokeResponse:
-        functic_functions: typing.Dict[
-            typing.Text, typing.Type[functic.FuncticBaseModel]
-        ] = app.state.functic_functions
-
         if function_invoke_request.name not in functic_functions:
             raise fastapi.HTTPException(status_code=404, detail="Function not found")
 
@@ -121,11 +127,10 @@ def create_app() -> fastapi.FastAPI:
     async def api_assistant_tool_call(
         request: fastapi.Request,
         required_action_function_tool_call: RequiredActionFunctionToolCall,
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
     ) -> ToolOutput:
-        functic_functions: typing.Dict[
-            typing.Text, typing.Type[functic.FuncticBaseModel]
-        ] = app.state.functic_functions
-
         if required_action_function_tool_call.function.name not in functic_functions:
             raise fastapi.HTTPException(status_code=404, detail="Function not found")
 
@@ -148,15 +153,15 @@ def create_app() -> fastapi.FastAPI:
     async def api_assistant_tool_calls(
         request: fastapi.Request,
         required_action_submit_tool_outputs: RequiredActionSubmitToolOutputs,
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
     ) -> AssistantToolCallsResponse:
-        functic_functions: typing.Dict[
-            typing.Text, typing.Type[functic.FuncticBaseModel]
-        ] = app.state.functic_functions
-
         for tool_call in required_action_submit_tool_outputs.tool_calls:
             if tool_call.function.name not in functic_functions:
                 raise fastapi.HTTPException(
-                    status_code=404, detail="Function not found"
+                    status_code=404,
+                    detail=f"Function '{tool_call.function.name}' not found",
                 )
 
         # Execute the functions
