@@ -13,6 +13,10 @@ from openai.types.beta.threads.required_action_function_tool_call import (
     RequiredActionFunctionToolCall,
 )
 from openai.types.beta.threads.run import RequiredActionSubmitToolOutputs
+from openai.types.chat import ChatCompletionMessageToolCall
+from openai.types.chat.chat_completion_tool_message_param import (
+    ChatCompletionToolMessageParam,
+)
 from openai.types.shared.function_definition import FunctionDefinition
 
 import functic
@@ -122,6 +126,38 @@ def create_app() -> fastapi.FastAPI:
         functic_obj = functic_model.from_args_str(function_invoke_request.arguments)
         await functic_obj.execute()
         return FunctionInvokeResponse(result=functic_obj.content_parsed)
+
+    @app.post("/chat/tool_call")
+    async def api_chat_tool_call(
+        request: fastapi.Request,
+        chat_completion_message_tool_call: ChatCompletionMessageToolCall,
+        functic_functions: FuncticFunctions = fastapi.Depends(
+            depends_functic_functions
+        ),
+    ) -> ChatCompletionToolMessageParam:
+        if chat_completion_message_tool_call.function.name not in functic_functions:
+            raise fastapi.HTTPException(status_code=404, detail="Function not found")
+
+        # Create the Functic model
+        functic_model = functic_functions[
+            chat_completion_message_tool_call.function.name
+        ]
+        functic_obj = functic_model.from_args_str(
+            chat_completion_message_tool_call.function.arguments
+        )
+        functic_obj.set_tool_call_id(chat_completion_message_tool_call.id)
+
+        # Execute the function
+        await functic_obj.execute()
+
+        # Return the tool message
+        return ChatCompletionToolMessageParam(
+            {
+                "role": "tool",
+                "content": functic_obj.content_parsed,
+                "tool_call_id": chat_completion_message_tool_call.id,
+            }
+        )
 
     @app.post("/assistant/tool_call")
     async def api_assistant_tool_call(
