@@ -8,15 +8,19 @@ version = "0.2.0"
 
 [tool.poetry.dependencies]
 diskcache = "*"
+fastapi = { extras = ["standard"], version = "*", optional = true }
 json_repair = "*"
+loguru = { version = "*", optional = true }
 openai = "^1"
 pydantic = "^2"
 pydantic-settings = "*"
+pymongo = { version = "*", optional = true }
 python = "^3.12"
 redis = "^5"
 
 [tool.poetry.extras]
-all = ["googlemaps"]
+all = ["fastapi", "googlemaps", "loguru", "pymongo"]
+svc = ["fastapi", "loguru", "pymongo"]
 
 [tool.poetry.group.docs.dependencies]
 mkdocs-git-authors-plugin = "*"
