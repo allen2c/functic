@@ -2,6 +2,7 @@ import contextlib
 import importlib
 import inspect
 import re
+import textwrap
 import typing
 
 import fastapi
@@ -81,13 +82,37 @@ async def lifespan(app: fastapi.FastAPI) -> typing.AsyncIterator[None]:
 
 def create_app() -> fastapi.FastAPI:
     logger.debug("Creating application")
-    app = fastapi.FastAPI(lifespan=lifespan)
+    app = fastapi.FastAPI(
+        title="Functic API",
+        summary="API service for executing OpenAI function tools with ease",
+        description=textwrap.dedent(
+            """
+            Functic API provides endpoints to manage and execute OpenAI function tools in a standardized way.
 
-    def depends_functic_functions() -> FuncticFunctions:
+            Key features:
+            - List and retrieve available function definitions
+            - Execute functions via direct invocation
+            - Handle OpenAI Chat Completion tool calls
+            - Support for OpenAI Assistant tool calls
+            - Built-in support for weather forecasts and geocoding functions
+
+            The API integrates with OpenAI's function calling capabilities and provides a consistent interface
+            for executing functions across different services like Azure Maps and Google Maps.
+            """  # noqa: E501
+        ).strip(),
+        version=functic.__version__,
+        lifespan=lifespan,
+    )
+
+    def depends_functic_functions(request: fastapi.Request) -> FuncticFunctions:
         return app.state.functic_functions
 
     # Add routes
-    @app.get("/functions")
+    @app.get(
+        "/functions",
+        summary="List Available Functions",
+        description="Retrieves a paginated list of all available function definitions that can be used as OpenAI function tools. Each function includes its name, description, and parameter schema.",  # noqa: E501
+    )
     async def api_list_functions(
         request: fastapi.Request,
         functic_functions: FuncticFunctions = fastapi.Depends(
@@ -98,7 +123,11 @@ def create_app() -> fastapi.FastAPI:
             data=[m.function_definition for m in list(functic_functions.values())]
         )
 
-    @app.get("/functions/{function_name}")
+    @app.get(
+        "/functions/{function_name}",
+        summary="Retrieve Function Definition",
+        description="Retrieves the complete function definition for a specific function by its name. Returns detailed information including the function's name, description, parameters schema, and required fields.",  # noqa: E501
+    )
     async def api_retrieve_function(
         request: fastapi.Request,
         function_name: typing.Text = fastapi.Path(...),
@@ -112,7 +141,11 @@ def create_app() -> fastapi.FastAPI:
         functic_model = functic_functions[function_name]
         return functic_model.function_definition
 
-    @app.post("/functions/invoke")
+    @app.post(
+        "/functions/invoke",
+        summary="Invoke Function",
+        description="Executes a specific function with the provided arguments. The function must be registered in the system. Returns the function's execution result in a standardized format.",  # noqa: E501
+    )
     async def api_invoke_function(
         function_invoke_request: Function = fastapi.Body(...),
         functic_functions: FuncticFunctions = fastapi.Depends(
@@ -127,7 +160,11 @@ def create_app() -> fastapi.FastAPI:
         await functic_obj.execute()
         return FunctionInvokeResponse(result=functic_obj.content_parsed)
 
-    @app.post("/chat/tool_call")
+    @app.post(
+        "/chat/tool_call",
+        summary="Handle Chat-Based Tool Calls",
+        description="Processes tool call requests initiated via chat interfaces. This endpoint validates the requested function, executes it with the provided arguments, and returns the result formatted for chat interactions.",  # noqa: E501
+    )
     async def api_chat_tool_call(
         request: fastapi.Request,
         chat_completion_message_tool_call: ChatCompletionMessageToolCall,
@@ -159,7 +196,11 @@ def create_app() -> fastapi.FastAPI:
             }
         )
 
-    @app.post("/assistant/tool_call")
+    @app.post(
+        "/assistant/tool_call",
+        summary="Execute Assistant-Initiated Tool Call",
+        description="Handles tool call requests initiated by assistant actions. This endpoint ensures the requested function exists, executes it with the provided arguments, and returns the tool's output.",  # noqa: E501
+    )
     async def api_assistant_tool_call(
         request: fastapi.Request,
         required_action_function_tool_call: RequiredActionFunctionToolCall,
@@ -185,7 +226,11 @@ def create_app() -> fastapi.FastAPI:
         # Return the tool output
         return functic_obj.tool_output
 
-    @app.post("/assistant/tool_calls")
+    @app.post(
+        "/assistant/tool_calls",
+        summary="Batch Execute Multiple Assistant-Initiated Tool Calls",
+        description="Processes a batch of tool call requests initiated by assistant actions. This endpoint validates each requested function, executes them concurrently with the provided arguments, and returns a consolidated response containing all tool outputs.",  # noqa: E501
+    )
     async def api_assistant_tool_calls(
         request: fastapi.Request,
         required_action_submit_tool_outputs: RequiredActionSubmitToolOutputs,
