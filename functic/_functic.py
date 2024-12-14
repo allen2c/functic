@@ -232,7 +232,7 @@ class FuncticBaseModel(BaseModel, FuncticParser):
     _content: Optional[Any | openai.NotGiven] = PrivateAttr(default=openai.NOT_GIVEN)
 
     @classmethod
-    def from_args_str(cls, args_str: Text):
+    def from_args_str(cls, args_str: Optional[Text]):
         func_kwargs = (
             json.loads(repair_json(args_str)) if args_str else {}  # type: ignore
         )

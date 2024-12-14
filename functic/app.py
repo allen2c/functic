@@ -8,10 +8,16 @@ import fastapi
 import pydantic
 import pydantic_settings
 from loguru import logger
+from openai.types.beta.threads.required_action_function_tool_call import (
+    Function,
+    RequiredActionFunctionToolCall,
+)
+from openai.types.beta.threads.run import RequiredActionSubmitToolOutputs
 from openai.types.shared.function_definition import FunctionDefinition
 
 import functic
 from functic.types.pagination import Pagination
+from functic.types.tool_output import ToolOutput
 
 
 @contextlib.asynccontextmanager
@@ -73,23 +79,57 @@ def create_app() -> fastapi.FastAPI:
 
     # Add routes
     @app.get("/functions")
-    def api_list_functions(request: fastapi.Request) -> Pagination[FunctionDefinition]:
+    async def api_list_functions(
+        request: fastapi.Request,
+    ) -> Pagination[FunctionDefinition]:
         functic_models: typing.List[typing.Type[functic.FuncticBaseModel]] = list(
             app.state.functic_functions.values()
         )
         return Pagination(data=[m.function_definition for m in functic_models])
 
     @app.get("/functions/{function_name}")
-    def api_retrieve_function(
+    async def api_retrieve_function(
         request: fastapi.Request, function_name: str
     ) -> FunctionDefinition:
         functic_functions: typing.Dict[
             typing.Text, typing.Type[functic.FuncticBaseModel]
         ] = app.state.functic_functions
+
         if function_name not in functic_functions:
             raise fastapi.HTTPException(status_code=404, detail="Function not found")
+
         functic_model = functic_functions[function_name]
         return functic_model.function_definition
+
+    @app.post("/functions/invoke")
+    async def api_invoke_function(
+        function_invoke_request: Function = fastapi.Body(...),
+    ) -> FunctionInvokeResponse:
+        functic_functions: typing.Dict[
+            typing.Text, typing.Type[functic.FuncticBaseModel]
+        ] = app.state.functic_functions
+
+        if function_invoke_request.name not in functic_functions:
+            raise fastapi.HTTPException(status_code=404, detail="Function not found")
+
+        functic_model = functic_functions[function_invoke_request.name]
+        functic_obj = functic_model.from_args_str(function_invoke_request.arguments)
+        await functic_obj.execute()
+        return FunctionInvokeResponse(result=functic_obj.content_parsed)
+
+    @app.post("/assistant/tool_call")
+    async def api_submit_tool_call(
+        request: fastapi.Request,
+        required_action_function_tool_call: RequiredActionFunctionToolCall,
+    ) -> ToolOutput:
+        pass
+
+    @app.post("/assistant/tool_calls")
+    def api_submit_tool_calls(
+        request: fastapi.Request,
+        required_action_submit_tool_outputs: RequiredActionSubmitToolOutputs,
+    ) -> AssistantToolCallsResponse:
+        pass
 
     return app
 
@@ -126,6 +166,14 @@ class AppSettings(pydantic_settings.BaseSettings):
                     output.append(s)
             return output
         return value
+
+
+class FunctionInvokeResponse(pydantic.BaseModel):
+    result: typing.Any
+
+
+class AssistantToolCallsResponse(pydantic.BaseModel):
+    tool_outputs: typing.List[ToolOutput]
 
 
 app = create_app()
