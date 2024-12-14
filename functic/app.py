@@ -89,7 +89,7 @@ def create_app() -> fastapi.FastAPI:
 
     @app.get("/functions/{function_name}")
     async def api_retrieve_function(
-        request: fastapi.Request, function_name: str
+        request: fastapi.Request, function_name: typing.Text = fastapi.Path(...)
     ) -> FunctionDefinition:
         functic_functions: typing.Dict[
             typing.Text, typing.Type[functic.FuncticBaseModel]
@@ -118,18 +118,59 @@ def create_app() -> fastapi.FastAPI:
         return FunctionInvokeResponse(result=functic_obj.content_parsed)
 
     @app.post("/assistant/tool_call")
-    async def api_submit_tool_call(
+    async def api_assistant_tool_call(
         request: fastapi.Request,
         required_action_function_tool_call: RequiredActionFunctionToolCall,
     ) -> ToolOutput:
-        pass
+        functic_functions: typing.Dict[
+            typing.Text, typing.Type[functic.FuncticBaseModel]
+        ] = app.state.functic_functions
+
+        if required_action_function_tool_call.function.name not in functic_functions:
+            raise fastapi.HTTPException(status_code=404, detail="Function not found")
+
+        # Create the Functic model
+        functic_model = functic_functions[
+            required_action_function_tool_call.function.name
+        ]
+        functic_obj = functic_model.from_args_str(
+            required_action_function_tool_call.function.arguments
+        )
+        functic_obj.set_tool_call_id(required_action_function_tool_call.id)
+
+        # Execute the function
+        await functic_obj.execute()
+
+        # Return the tool output
+        return functic_obj.tool_output
 
     @app.post("/assistant/tool_calls")
-    def api_submit_tool_calls(
+    async def api_assistant_tool_calls(
         request: fastapi.Request,
         required_action_submit_tool_outputs: RequiredActionSubmitToolOutputs,
     ) -> AssistantToolCallsResponse:
-        pass
+        functic_functions: typing.Dict[
+            typing.Text, typing.Type[functic.FuncticBaseModel]
+        ] = app.state.functic_functions
+
+        for tool_call in required_action_submit_tool_outputs.tool_calls:
+            if tool_call.function.name not in functic_functions:
+                raise fastapi.HTTPException(
+                    status_code=404, detail="Function not found"
+                )
+
+        # Execute the functions
+        tool_outputs: typing.List[ToolOutput] = []
+        for tool_call in required_action_submit_tool_outputs.tool_calls:
+            functic_model = functic_functions[tool_call.function.name]
+            functic_obj = functic_model.from_args_str(tool_call.function.arguments)
+            functic_obj.set_tool_call_id(tool_call.id)
+
+            await functic_obj.execute()
+
+            tool_outputs.append(functic_obj.tool_output)
+
+        return AssistantToolCallsResponse(tool_outputs=tool_outputs)
 
     return app
 
