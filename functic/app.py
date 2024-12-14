@@ -8,8 +8,10 @@ import fastapi
 import pydantic
 import pydantic_settings
 from loguru import logger
+from openai.types.shared.function_definition import FunctionDefinition
 
 import functic
+from functic.types.pagination import Pagination
 
 
 @contextlib.asynccontextmanager
@@ -70,7 +72,24 @@ def create_app() -> fastapi.FastAPI:
     app = fastapi.FastAPI(lifespan=lifespan)
 
     # Add routes
-    # TODO:
+    @app.get("/functions")
+    def api_list_functions(request: fastapi.Request) -> Pagination[FunctionDefinition]:
+        functic_models: typing.List[typing.Type[functic.FuncticBaseModel]] = list(
+            app.state.functic_functions.values()
+        )
+        return Pagination(data=[m.function_definition for m in functic_models])
+
+    @app.get("/functions/{function_name}")
+    def api_retrieve_function(
+        request: fastapi.Request, function_name: str
+    ) -> FunctionDefinition:
+        functic_functions: typing.Dict[
+            typing.Text, typing.Type[functic.FuncticBaseModel]
+        ] = app.state.functic_functions
+        if function_name not in functic_functions:
+            raise fastapi.HTTPException(status_code=404, detail="Function not found")
+        functic_model = functic_functions[function_name]
+        return functic_model.function_definition
 
     return app
 

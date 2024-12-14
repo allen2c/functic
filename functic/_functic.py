@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 R = TypeVar("R")
 P = ParamSpec("P")
 
+
 FunctionType = Callable[P, R]  # Regular function type
 CoroutineType = Callable[P, Coroutine[Any, Any, R]]  # Coroutine function type
 
