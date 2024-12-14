@@ -141,7 +141,7 @@ class FuncticConfig(BaseModel):
         return self.is_config_valid(self)
 
     def raise_if_invalid(self) -> None:
-        if not self.is_config_valid(self):
+        if not self.is_valid():
             raise ValueError(f"Invalid configuration: {self}")
 
     def get_function(self) -> FunctionType | CoroutineType:

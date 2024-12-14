@@ -1,4 +1,7 @@
 import contextlib
+import importlib
+import inspect
+import re
 import typing
 
 import fastapi
@@ -6,15 +9,15 @@ import pydantic
 import pydantic_settings
 from loguru import logger
 
+import functic
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI) -> typing.AsyncIterator[None]:
-    yield
-
-
-def set_app_config(app: fastapi.FastAPI) -> fastapi.FastAPI:
     import pymongo
 
+    # Setup application
+    logger.debug("Setting up application")
     app_settings = AppSettings()
     app.state.settings = app_settings
     app.state.logger = logger
@@ -22,15 +25,49 @@ def set_app_config(app: fastapi.FastAPI) -> fastapi.FastAPI:
         app_settings.FUNCTIC_DATABASE_CONNECTION_STRING.get_secret_value(),
     )
 
-    return app
+    # Load functic functions
+    logger.debug("Loading functic functions")
+    functic_functions: typing.Dict[
+        typing.Text, typing.Type[functic.FuncticBaseModel]
+    ] = {}
+    for module_name in app_settings.FUNCTIC_FUNCTIONS:
+        logger.debug(f"Reading module: '{module_name}'")
+        _mod = importlib.import_module(module_name)
+
+        for cls_name, _cls in inspect.getmembers(_mod, inspect.isclass):
+            if (
+                _cls.__module__ == _mod.__name__  # The class is defined in the module
+                and issubclass(
+                    _cls, functic.FuncticBaseModel
+                )  # The class is a subclass of FuncticBaseModel
+            ):  # Filter out non-functic classes
+                logger.debug(f"Validating functic class: '{cls_name}'")
+
+                # Validate the function config
+                _cls.functic_config.raise_if_invalid()
+
+                _func_name = _cls.functic_config.name
+
+                # Check for duplicate function names
+                if _func_name in functic_functions:
+                    logger.warning(
+                        "There are multiple functions with the same name: "
+                        + f"{_func_name}, overwriting the first one."
+                        + "You might want to rename one of them to "
+                        + "avoid this issue."
+                    )
+
+                functic_functions[_func_name] = _cls
+                logger.info(f"Added function: '{_func_name}'")
+
+    app.state.functic_functions = functic_functions
+
+    yield
 
 
 def create_app() -> fastapi.FastAPI:
     logger.debug("Creating application")
     app = fastapi.FastAPI(lifespan=lifespan)
-
-    # Set app states
-    set_app_config(app)
 
     # Add routes
     # TODO:
@@ -51,6 +88,25 @@ class AppSettings(pydantic_settings.BaseSettings):
         default="functions",
         description="The name of the Functic functions repository table",
     )
+    FUNCTIC_FUNCTIONS: typing.List[typing.Text] = pydantic.Field(
+        default_factory=lambda: [
+            "functic.functions.azure.get_weather_forecast_daily",
+            "functic.functions.azure.get_weather_forecast_hourly",
+            "functic.functions.google.get_maps_geocode",
+        ],
+        description="The list of Functic functions",
+    )
+
+    @pydantic.field_validator("FUNCTIC_FUNCTIONS", mode="before")
+    def split_functic_functions(cls, value):
+        if isinstance(value, typing.Text):
+            output: typing.List[typing.Text] = []
+            for s in re.split(r"[;,]", value):
+                s = s.strip(" '\"").strip()
+                if s:
+                    output.append(s)
+            return output
+        return value
 
 
 app = create_app()
