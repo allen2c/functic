@@ -1,8 +1,10 @@
+import json
 import textwrap
 import typing
 
 import httpx
 import pydantic
+import pydantic_core
 
 from functic import FuncticBaseModel, FuncticConfig
 from functic.config import console
@@ -87,17 +89,26 @@ GET_CURRENCIES_CONFIG = FuncticConfig.model_validate(
 )
 
 
-async def get_currencies(
-    base: CurrencySymbol = "USD",
-    symbols: typing.Optional[typing.List[CurrencySymbol]] = None,
-) -> "GetCurrenciesResponse":
+async def get_currencies(request: "GetCurrencies") -> "GetCurrenciesResponse":
     url = httpx.URL("https://api.frankfurter.dev/v1/latest")
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"base": base, "symbols": symbols})
-        return GetCurrenciesResponse.model_validate(response.json())
+        response = await client.get(
+            url, params=json.loads(request.model_dump_json(exclude_none=True))
+        )
+        try:
+            return GetCurrenciesResponse.model_validate(response.json())
+        except pydantic_core.ValidationError as e:
+            console.print(
+                f"Can not cast response to GetCurrenciesResponse: {response.json()}",
+                style="red",
+            )
+            raise e
 
 
 class GetCurrencies(FuncticBaseModel):
+    # Function metadata
+    functic_config = GET_CURRENCIES_CONFIG
+    # Function arguments
     base: CurrencySymbol = pydantic.Field(
         default="USD", description="The base currency to convert from"
     )

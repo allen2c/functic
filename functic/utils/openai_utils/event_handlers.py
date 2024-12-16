@@ -59,7 +59,7 @@ class FuncticEventHandler(AssistantEventHandler):
                 # Debugging
                 if self.debug:
                     console.print(
-                        f"Calling function: '{tool_call.function.name}' "
+                        f"\nCalling function: '{tool_call.function.name}' "
                         + f"with args: '{tool_call.function.arguments}'"
                     )
 
@@ -79,7 +79,7 @@ class FuncticEventHandler(AssistantEventHandler):
 
                 # Debugging
                 if self.debug:
-                    console.print(f"Tool output: {tool_output_param}")
+                    console.print(f"Tool output: {tool_output_param}\n")
 
                 break
 

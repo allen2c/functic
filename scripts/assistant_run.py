@@ -10,6 +10,7 @@ from openai.types.beta.threads import Message
 
 import functic.utils.openai_utils.ensure as ENSURE
 from functic.config import console, settings
+from functic.functions.assorted.currencies import GetCurrencies
 from functic.functions.azure.get_weather_forecast_daily import GetWeatherForecastDaily
 from functic.functions.azure.get_weather_forecast_hourly import GetWeatherForecastHourly
 from functic.functions.google.get_maps_geocode import GetMapsGeocode
@@ -34,8 +35,12 @@ ASSISTANT_INSTRUCTIONS = dedent(
     """  # noqa: E501
 ).strip()
 ASSISTANT_MODEL = "gpt-4o-mini"
-FUNCTION_TOOLS = (GetWeatherForecastDaily, GetWeatherForecastHourly, GetMapsGeocode)
-ASSISTANT_TOOLS = [tool.function_tool for tool in FUNCTION_TOOLS]
+FUNCTION_TOOLS = (
+    GetWeatherForecastDaily,
+    GetWeatherForecastHourly,
+    GetMapsGeocode,
+    GetCurrencies,
+)
 FORCE = False
 DEBUG = True
 
@@ -51,7 +56,6 @@ def main():
             name=ASSISTANT_NAME,
             instructions=ASSISTANT_INSTRUCTIONS,
             model=ASSISTANT_MODEL,
-            tools=ASSISTANT_TOOLS,
         ),
         force=FORCE,
     )
@@ -72,13 +76,17 @@ def main():
         client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
-            content="How is the weather in Tokyo day after tomorrow?",
+            content=(
+                "How is the weather in Tokyo day after tomorrow? "
+                + "And how is a USD to EUR conversion?"
+            ),
         )
     )
 
     with client.beta.threads.runs.stream(
         thread_id=thread.id,
         assistant_id=assistant.id,
+        tools=[tool.function_tool_param for tool in FUNCTION_TOOLS],
         event_handler=FuncticEventHandler(
             client, tools_set=FUNCTION_TOOLS, messages=thread_messages, debug=DEBUG
         ),
