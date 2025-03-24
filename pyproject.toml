@@ -15,7 +15,7 @@ openai = "^1"
 pydantic = "^2"
 pydantic-settings = "*"
 pymongo = { extras = ["srv"], version = "*", optional = true }
-python = "^3.12"
+python = ">=3.11,<4"
 redis = "^5"
 
 [tool.poetry.extras]
