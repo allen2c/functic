@@ -1,5 +1,6 @@
 import typing
 
+import agents
 import pydantic
 import requests
 
@@ -7,51 +8,50 @@ import functic
 
 
 def get_weather(
-    latitude: float,
-    longitude: float,
-    timezone: str = "auto",
-    include_current: bool = True,
-    include_hourly: bool = False,
-    include_daily: bool = True,
+    request: "GetWeather", context: agents.TContext | None = None, *args, **kwargs
 ) -> "GetWeatherResponse":
     """
-    Get weather data using the Open-Meteo API (free, no API key required).
+    Get weather data using the Open-Meteo API.
+    Supports current weather, hourly, and daily forecasts for any global location.
+    Free API with no authentication required.
 
     Args:
-        latitude: Latitude coordinate (-90 to 90)
-        longitude: Longitude coordinate (-180 to 180)
-        timezone: Timezone (default: "auto" for automatic detection)
-        include_current: Include current weather data
-        include_hourly: Include hourly forecast
-        include_daily: Include daily forecast
+        request: GetWeather request with coordinates and forecast options
+        context: Optional agent context for execution
 
     Returns:
-        Dictionary containing weather data from Open-Meteo API
+        GetWeatherResponse: Weather data including current conditions and forecasts
 
     Raises:
-        requests.exceptions.RequestException: If API request fails
         ValueError: If coordinates are invalid
+        requests.exceptions.RequestException: If API request fails
     """
     # Validate coordinates
-    if not (-90 <= latitude <= 90):
-        raise ValueError(f"Latitude must be between -90 and 90, got {latitude}")
-    if not (-180 <= longitude <= 180):
-        raise ValueError(f"Longitude must be between -180 and 180, got {longitude}")
+    if not (-90 <= request.latitude <= 90):
+        raise ValueError(f"Latitude must be between -90 and 90, got {request.latitude}")
+    if not (-180 <= request.longitude <= 180):
+        raise ValueError(
+            f"Longitude must be between -180 and 180, got {request.longitude}"
+        )
 
     # Build API URL
     base_url = "https://api.open-meteo.com/v1/forecast"
-    params = {"latitude": latitude, "longitude": longitude, "timezone": timezone}
+    params = {
+        "latitude": request.latitude,
+        "longitude": request.longitude,
+        "timezone": request.timezone,
+    }
 
     # Add weather parameters based on options
-    if include_current:
+    if request.include_current:
         params["current"] = (
             "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m"
         )
 
-    if include_hourly:
+    if request.include_hourly:
         params["hourly"] = "temperature_2m,precipitation_probability,wind_speed_10m"
 
-    if include_daily:
+    if request.include_daily:
         params["daily"] = (
             "weather_code,temperature_2m_max,temperature_2m_min,"
             "precipitation_probability_max"
@@ -83,6 +83,14 @@ class GetWeatherConfig(functic.FuncticConfig):
 
 class GetWeather(functic.FuncticBaseModel):
     functic_config: typing.ClassVar[typing.Type[GetWeatherConfig]] = GetWeatherConfig
+
+    # Args
+    latitude: float
+    longitude: float
+    timezone: str = "auto"
+    include_current: bool = True
+    include_hourly: bool = False
+    include_daily: bool = False
 
 
 class CurrentWeatherUnits(pydantic.BaseModel):
@@ -226,7 +234,7 @@ if __name__ == "__main__":
     # Get weather for Taipei
     try:
         weather_data = get_weather(
-            latitude=25.03, longitude=121.57, timezone="Asia/Taipei"
+            request=GetWeather(latitude=25.03, longitude=121.57, timezone="Asia/Taipei")
         )
 
         print("✅ Successfully fetched weather data from Open-Meteo!")
