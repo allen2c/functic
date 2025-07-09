@@ -1,5 +1,9 @@
+import typing
+
 import pydantic
 import requests
+
+import functic
 
 
 def get_weather(
@@ -59,6 +63,26 @@ def get_weather(
         return GetWeatherResponse.model_validate(response.json())
     except requests.exceptions.RequestException as e:
         raise requests.exceptions.RequestException(f"Failed to fetch weather data: {e}")
+
+
+class GetWeatherConfig(functic.FuncticConfig):
+    name: typing.Text = pydantic.Field(
+        "get_weather",
+        description="The name of the function.",
+        pattern=r"^[a-zA-Z0-9_-]*$",
+    )
+    description: typing.Text = pydantic.Field(
+        "Get weather data using the Open-Meteo API (free, no API key required).",
+        description="A description of the function.",
+    )
+    function: typing.Text = pydantic.Field(
+        "functic.functions.examples.get_weather:get_weather",
+        description="The path of the callable function.",
+    )
+
+
+class GetWeather(functic.FuncticBaseModel):
+    functic_config: typing.ClassVar[typing.Type[GetWeatherConfig]] = GetWeatherConfig
 
 
 class CurrentWeatherUnits(pydantic.BaseModel):
